@@ -1,0 +1,234 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  OFFICER
+  FIELD_WORKER
+  CITIZEN
+}
+
+enum AssetStatus {
+  OPERATIONAL
+  UNDER_MAINTENANCE
+  DAMAGED
+  INACTIVE
+  RETIRED
+}
+
+enum AssetCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  CRITICAL
+}
+
+enum Criticality {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ComplaintStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  VERIFIED
+  CLOSED
+}
+
+enum WorkOrderStatus {
+  CREATED
+  ASSIGNED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  VERIFIED
+  CLOSED
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  SUCCESS
+  ERROR
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          Role           @default(CITIZEN)
+  departmentId  String?
+  department    Department?    @relation(fields: [departmentId], references: [id])
+  complaints    Complaint[]    @relation("CitizenComplaints")
+  officerOrders WorkOrder[]    @relation("OfficerWorkOrders")
+  workerOrders  WorkOrder[]    @relation("WorkerWorkOrders")
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([role])
+}
+
+model Department {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  users       User[]
+  assets      Asset[]
+  complaints  Complaint[]
+  workOrders  WorkOrder[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Asset {
+  id                  String             @id // AST-XXXX format
+  name                String
+  description         String?
+  assetType           String             // e.g., Streetlight, Road, Water Pipeline, etc.
+  status              AssetStatus        @default(OPERATIONAL)
+  condition           AssetCondition     @default(GOOD)
+  criticality         Criticality        @default(MEDIUM)
+  latitude            Float
+  longitude           Float
+  installationDate    DateTime
+  lastInspectionDate  DateTime?
+  lastMaintenanceDate DateTime?
+  nextMaintenanceDate DateTime?
+  estimatedValue      Float?
+  warrantyInfo        String?
+  photos              String[]           // Array of base64 data URLs / file paths
+  riskScore           Int                @default(0)
+  riskLevel           String             @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+  riskReasoning       String?
+  departmentId        String
+  department          Department         @relation(fields: [departmentId], references: [id])
+  complaints          Complaint[]
+  workOrders          WorkOrder[]
+  maintenanceRecords  MaintenanceRecord[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([status])
+  @@index([condition])
+  @@index([departmentId])
+}
+
+model MaintenanceRecord {
+  id                  String           @id @default(uuid())
+  assetId             String
+  asset               Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  maintenanceType     String           // Routine, Preventive, Emergency, Repair, Replacement
+  date                DateTime         @default(now())
+  cost                Float
+  technician          String
+  description         String
+  partsUsed           String?
+  beforeImage         String?          // Base64 data URL
+  afterImage          String?          // Base64 data URL
+  nextMaintenanceDate DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([assetId])
+}
+
+model Complaint {
+  id           String          @id // CMP-XXXX format
+  category     String          // e.g., Streetlight, Road, etc.
+  description  String
+  priority     Criticality     @default(MEDIUM)
+  severity     String          @default("MEDIUM") // LOW, MEDIUM, HIGH
+  status       ComplaintStatus @default(SUBMITTED)
+  latitude     Float
+  longitude    Float
+  imageUrl     String?         // Base64 data URL
+  citizenId    String
+  citizen      User            @relation("CitizenComplaints", fields: [citizenId], references: [id], onDelete: Cascade)
+  assetId      String?
+  asset        Asset?          @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  departmentId String?
+  department   Department?     @relation(fields: [departmentId], references: [id])
+  workOrder    WorkOrder?      @relation("ComplaintWorkOrder")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([status])
+  @@index([citizenId])
+  @@index([departmentId])
+}
+
+model WorkOrder {
+  id                  String          @id // WO-XXXX format
+  complaintId         String          @unique
+  complaint           Complaint       @relation("ComplaintWorkOrder", fields: [complaintId], references: [id], onDelete: Cascade)
+  assetId             String
+  asset               Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  departmentId        String
+  department          Department      @relation(fields: [departmentId], references: [id])
+  assignedOfficerId   String
+  assignedOfficer     User            @relation("OfficerWorkOrders", fields: [assignedOfficerId], references: [id])
+  assignedWorkerId    String
+  assignedWorker      User            @relation("WorkerWorkOrders", fields: [assignedWorkerId], references: [id])
+  priority            Criticality     @default(MEDIUM)
+  status              WorkOrderStatus @default(CREATED)
+  description         String
+  beforeImage         String?         // Base64 data URL
+  afterImage          String?         // Base64 data URL
+  repairNotes         String?
+  slaDeadline         DateTime
+  slaBreached         Boolean         @default(false)
+  completionTimestamp DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([status])
+  @@index([assignedWorkerId])
+  @@index([assignedOfficerId])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  type      NotificationType @default(INFO)
+  link      String?          // Redirection path
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([read])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String   // e.g., UPDATE_STATUS, CREATE_ASSET
+  entityName String   // Asset, Complaint, WorkOrder
+  entityId   String
+  oldValue   String?  // JSON stringified or raw value
+  newValue   String?  // JSON stringified or raw value
+  timestamp  DateTime @default(now())
+
+  @@index([entityName, entityId])
+}
