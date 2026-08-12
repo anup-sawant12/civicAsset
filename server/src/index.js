@@ -1,10 +1,11 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-const logger = require('./utils/logger');
-const errorHandler = require('./middleware/errorHandler');
-const authRoutes = require('./routes/authRoutes');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import http from 'http';
+import logger from './utils/logger.js';
+import errorHandler from './middleware/errorHandler.js';
+import authRoutes from './routes/authRoutes.js';
+import assetRoutes from './routes/assetRoutes.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -26,6 +27,9 @@ app.get('/api/health', (req, res) => {
 // Auth API Routes
 app.use('/api/auth', authRoutes);
 
+// Asset API Routes
+app.use('/api/assets', assetRoutes);
+
 // Error Handler Middleware
 app.use(errorHandler);
 
@@ -36,4 +40,4 @@ server.listen(PORT, () => {
   logger.info(`[CivicAsset Server] Running on port ${PORT}`);
 });
 
-module.exports = { app, server };
+export { app, server };
