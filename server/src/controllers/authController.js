@@ -1,7 +1,7 @@
-const prisma = require('../config/prisma.js');
-const { hashPassword, comparePassword, generateToken } = require('../utils/auth');
+import prisma from '../config/prisma.js';
+import { hashPassword, comparePassword, generateToken } from '../utils/auth.js';
 
-const register = async (req, res) => {
+export const register = async (req, res) => {
   try {
     const { email, password, firstName, lastName } = req.body;
 
@@ -42,7 +42,8 @@ const register = async (req, res) => {
         email: newUser.email,
         firstName: newUser.firstName,
         lastName: newUser.lastName,
-        role: newUser.role
+        role: newUser.role,
+        departmentId: newUser.departmentId || null
       }
     });
 
@@ -57,7 +58,7 @@ const register = async (req, res) => {
 
 //login
 
-const login = async (req, res) => {
+export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -86,7 +87,8 @@ const login = async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role
+        role: user.role,
+        departmentId: user.departmentId || null
       }
     });
   } catch (error) {
@@ -96,9 +98,4 @@ const login = async (req, res) => {
       error: error.message
     });
   }
-};
-
-module.exports = {
-  register,
-  login
 };

@@ -1,7 +1,7 @@
-const { verifyToken } = require('../utils/auth');
+import { verifyToken } from '../utils/auth.js';
 
 // Middleware to authenticate user using JWT token
-const authenticate = async (req, res, next) => {
+export const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -20,16 +20,11 @@ const authenticate = async (req, res, next) => {
 };
 
 // Middleware to check if user has required roles (RBAC)
-const authorize = (allowedRoles) => {
+export const authorize = (allowedRoles) => {
   return (req, res, next) => {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Forbidden. You do not have permission to access this resource.' });
     }
     next();
   };
-};
-
-module.exports = {
-  authenticate,
-  authorize
 };

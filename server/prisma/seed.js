@@ -1,6 +1,5 @@
-
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -78,6 +77,80 @@ async function main() {
   });
 
   console.log('Users seeded!');
+
+  // 5. Create Mock Assets (Mumbai area)
+  console.log('Seeding mock assets...');
+  
+  await prisma.asset.create({
+    data: {
+      id: 'AST-1001',
+      name: 'Gateway of India Lighting System',
+      description: 'Decorative illumination and security lighting grid surrounding the Gateway monument.',
+      assetType: 'Streetlight',
+      latitude: 18.9220,
+      longitude: 72.8347,
+      installationDate: new Date('2024-01-15'),
+      estimatedValue: 12500.00,
+      warrantyInfo: '5 Year Manufacturer Warranty',
+      departmentId: worksDept.id,
+      status: 'OPERATIONAL',
+      condition: 'EXCELLENT'
+    }
+  });
+
+  await prisma.asset.create({
+    data: {
+      id: 'AST-1002',
+      name: 'Marine Drive Transformer Station',
+      description: 'High-capacity step-down transformer providing power to promenade lamp posts.',
+      assetType: 'Transformer',
+      latitude: 18.9430,
+      longitude: 72.8227,
+      installationDate: new Date('2023-08-20'),
+      estimatedValue: 45000.00,
+      warrantyInfo: '3 Year standard warranty',
+      departmentId: worksDept.id,
+      status: 'OPERATIONAL',
+      condition: 'GOOD'
+    }
+  });
+
+  await prisma.asset.create({
+    data: {
+      id: 'AST-1003',
+      name: 'Juhu Beach Water Pipeline Trunk',
+      description: 'Main water distribution pipe route supplying beach public facilities and local sectors.',
+      assetType: 'Water Pipeline',
+      latitude: 19.1020,
+      longitude: 72.8264,
+      installationDate: new Date('2022-04-10'),
+      estimatedValue: 85000.00,
+      warrantyInfo: 'N/A',
+      departmentId: waterDept.id,
+      status: 'OPERATIONAL',
+      condition: 'FAIR'
+    }
+  });
+
+  await prisma.asset.create({
+    data: {
+      id: 'AST-1004',
+      name: 'Bandra Reclamation LED Network',
+      description: 'Smart lighting posts along Bandra West Reclamation bypass.',
+      assetType: 'Streetlight',
+      latitude: 19.0544,
+      longitude: 72.8402,
+      installationDate: new Date('2025-05-18'),
+      estimatedValue: 24000.00,
+      warrantyInfo: '2 Year standard warranty',
+      departmentId: worksDept.id,
+      status: 'UNDER_MAINTENANCE',
+      condition: 'POOR'
+    }
+  });
+
+  console.log('Mock assets seeded!');
+
   console.log({
     Admin: admin.email,
     Officer: officer.email,
