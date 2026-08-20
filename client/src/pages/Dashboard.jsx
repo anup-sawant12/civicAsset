@@ -1,20 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { getAssets, createAsset, updateAsset, deleteAsset, getDepartments } from '../services/assetService';
 import { getCurrentUser } from '../services/authService';
+import { getComplaints, createComplaint, updateComplaint, deleteComplaint } from '../services/complaintService';
 import AssetMap from '../components/AssetMap';
 
 function Dashboard() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('assets'); // 'assets', 'complaints', 'orders', 'maintenance'
   const [assets, setAssets] = useState([]);
+  const [complaints, setComplaints] = useState([]);
   const [selectedAsset, setSelectedAsset] = useState(null);
+  const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  // Filtering & Search
+  // Filtering & Search for Assets
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [conditionFilter, setConditionFilter] = useState('');
+
+  // Filtering & Search for Complaints
+  const [searchComplaint, setSearchComplaint] = useState('');
+  const [statusComplaintFilter, setStatusComplaintFilter] = useState('');
+  const [categoryComplaintFilter, setCategoryComplaintFilter] = useState('');
 
   // Map Center State (Defaults to Mumbai)
   const [mapCenter, setMapCenter] = useState([19.0760, 72.8777]);
@@ -31,11 +39,22 @@ function Dashboard() {
   const [newDeptId, setNewDeptId] = useState('');
   const [departments, setDepartments] = useState([]);
 
-  // Load user data and assets on startup
+  // Complaint Creation Modal Form State
+  const [showComplaintModal, setShowComplaintModal] = useState(false);
+  const [compCategory, setCompCategory] = useState('Streetlight');
+  const [compDesc, setCompDesc] = useState('');
+  const [compSeverity, setCompSeverity] = useState('MEDIUM');
+  const [compLat, setCompLat] = useState('19.0760');
+  const [compLng, setCompLng] = useState('72.8777');
+  const [compImage, setCompImage] = useState(null);
+  const [isPickingCoords, setIsPickingCoords] = useState(false);
+
+  // Load user data, assets, and complaints on startup
   useEffect(() => {
     const user = getCurrentUser();
     setCurrentUser(user);
     fetchAssets();
+    fetchComplaints();
     fetchDepartments();
   }, []);
 
@@ -57,12 +76,27 @@ function Dashboard() {
     try {
       const data = await getAssets();
       setAssets(data);
-      if (data.length > 0) {
-        // Set map center to first asset location if it exists
+      if (data.length > 0 && activeTab === 'assets') {
         setMapCenter([data[0].latitude, data[0].longitude]);
       }
     } catch (err) {
       setError(err.message || 'Failed to load assets');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchComplaints = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getComplaints();
+      setComplaints(data);
+      if (data.length > 0 && activeTab === 'complaints') {
+        setMapCenter([data[0].latitude, data[0].longitude]);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to load complaints');
     } finally {
       setLoading(false);
     }
@@ -88,9 +122,6 @@ function Dashboard() {
         departmentId: selectedDeptId
       };
 
-      // Since we just need a departmentId in schema, if user has none, we fetch first dept or fallback
-      // In seed, Works department has id, we will mock linking.
-      // Let's call endpoint
       await createAsset(payload);
       setShowAddModal(false);
       
@@ -103,10 +134,49 @@ function Dashboard() {
       setNewValue('');
       setNewWarranty('');
       
-      // Refresh list
       fetchAssets();
     } catch (err) {
       setError(err.message || 'Failed to create asset');
+    }
+  };
+
+  const handleFileComplaint = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const payload = {
+        category: compCategory,
+        description: compDesc,
+        severity: compSeverity,
+        latitude: parseFloat(compLat),
+        longitude: parseFloat(compLng),
+        imageUrl: compImage
+      };
+
+      await createComplaint(payload);
+      setShowComplaintModal(false);
+
+      // Reset form
+      setCompCategory('Streetlight');
+      setCompDesc('');
+      setCompSeverity('MEDIUM');
+      setCompLat('19.0760');
+      setCompLng('72.8777');
+      setCompImage(null);
+
+      fetchComplaints();
+    } catch (err) {
+      setError(err.message || 'Failed to file complaint');
+    }
+  };
+
+  const handleComplaintStatusUpdate = async (id, newStatus) => {
+    try {
+      const updated = await updateComplaint(id, { status: newStatus });
+      setComplaints(prev => prev.map(c => c.id === id ? updated : c));
+      setSelectedComplaint(updated);
+    } catch (err) {
+      alert(err.message || 'Failed to update complaint status');
     }
   };
 
@@ -121,12 +191,50 @@ function Dashboard() {
     }
   };
 
+  const handleDeleteComplaint = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this complaint?')) return;
+    try {
+      await deleteComplaint(id);
+      setSelectedComplaint(null);
+      fetchComplaints();
+    } catch (err) {
+      alert(err.message || 'Failed to delete complaint');
+    }
+  };
+
+  const handleMapClick = (lat, lng) => {
+    if (isPickingCoords) {
+      setCompLat(lat.toFixed(6));
+      setCompLng(lng.toFixed(6));
+      setIsPickingCoords(false);
+      setShowComplaintModal(true);
+    }
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCompImage(reader.result); // Base64 data URL
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     window.location.reload();
   };
 
-  // Filtered Assets list
+  const getImageUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('data:')) return path;
+    const serverUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
+    return `${serverUrl}${path}`;
+  };
+
+  // Filtered lists
   const filteredAssets = assets.filter((asset) => {
     const matchesSearch = asset.name.toLowerCase().includes(search.toLowerCase()) || 
                           asset.id.toLowerCase().includes(search.toLowerCase()) ||
@@ -136,61 +244,126 @@ function Dashboard() {
     return matchesSearch && matchesStatus && matchesCondition;
   });
 
+  const filteredComplaints = complaints.filter((comp) => {
+    const matchesSearch = comp.description.toLowerCase().includes(searchComplaint.toLowerCase()) || 
+                          comp.id.toLowerCase().includes(searchComplaint.toLowerCase()) ||
+                          comp.category.toLowerCase().includes(searchComplaint.toLowerCase());
+    const matchesStatus = statusComplaintFilter ? comp.status === statusComplaintFilter : true;
+    const matchesCategory = categoryComplaintFilter ? comp.category === categoryComplaintFilter : true;
+    return matchesSearch && matchesStatus && matchesCategory;
+  });
+
   return (
-    <div className="flex h-screen bg-primary-950 text-white overflow-hidden">
+    <div className="flex h-screen bg-primary-50 text-primary-800 overflow-hidden relative font-sans p-4 gap-4">
       
+      {/* Map coordinate picking banner overlay */}
+      {isPickingCoords && (
+        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-accent-600 border border-accent-500 text-white px-6 py-3 rounded-full shadow-medium z-50 flex items-center space-x-4 animate-bounce">
+          <span className="text-sm font-bold flex items-center">
+            <span className="inline-block w-2 h-2 rounded-full bg-white mr-2 animate-ping"></span>
+            📍 Click anywhere on the map to capture coordinates
+          </span>
+          <button 
+            onClick={() => {
+              setIsPickingCoords(false);
+              setShowComplaintModal(true);
+            }}
+            className="bg-accent-700 hover:bg-red-600 text-white px-3.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer border border-accent-500/50"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* 1. Left Sidebar Navigation */}
-      <aside className="w-64 bg-primary-900 border-r border-primary-800 flex flex-col justify-between p-6">
+      <aside className="w-64 bg-white/90 backdrop-blur-xl border border-primary-200/80 rounded-2xl flex flex-col justify-between p-6 z-10 shadow-soft">
         <div className="space-y-8">
-          <div>
-            <h2 className="text-2xl font-extrabold text-accent-400 tracking-tight">CivicAsset</h2>
-            <p className="text-[10px] text-primary-400 font-bold uppercase tracking-wider mt-1">Municipal Intel</p>
+          {/* Brand Header */}
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-accent-600 to-accent-400 flex items-center justify-center shadow-md shadow-accent-600/20">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 text-white">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-extrabold text-primary-900 tracking-tight">CivicAsset</h2>
+              <p className="text-[9px] text-accent-600 font-extrabold uppercase tracking-widest mt-0.5">Municipal GIS suite</p>
+            </div>
           </div>
 
           {/* Current User Card */}
           {currentUser && (
-            <div className="bg-primary-950/50 rounded-xl p-4 border border-primary-800/60">
-              <p className="text-xs text-primary-400 uppercase tracking-widest font-bold">Logged In As</p>
-              <h4 className="font-semibold text-white mt-1">{currentUser.firstName} {currentUser.lastName}</h4>
-              <span className="inline-block mt-2 px-2 py-0.5 text-[10px] font-bold rounded bg-accent-500/20 text-accent-300 uppercase">
-                {currentUser.role}
-              </span>
+            <div className="bg-primary-100/40 rounded-2xl p-4 border border-primary-200/50 flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-white to-primary-100 border border-primary-200/80 flex items-center justify-center text-accent-600 font-bold uppercase shadow-sm">
+                {currentUser.firstName[0]}{currentUser.lastName[0]}
+              </div>
+              <div className="text-left flex-1 min-w-0">
+                <h4 className="font-bold text-xs text-primary-900 truncate">{currentUser.firstName} {currentUser.lastName}</h4>
+                <span className="inline-flex mt-1 px-2 py-0.5 text-[8px] font-bold rounded-full bg-accent-50 border border-accent-100 text-accent-600 uppercase tracking-wider">
+                  {currentUser.role}
+                </span>
+              </div>
             </div>
           )}
 
           {/* Tab Navigation Menu */}
-          <nav className="flex flex-col space-y-2">
+          <nav className="flex flex-col space-y-1 pt-4">
             <button
               onClick={() => setActiveTab('assets')}
-              className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'assets' ? 'bg-accent-500 text-white shadow-lg shadow-accent-500/10' : 'text-primary-300 hover:bg-primary-800'
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-3 border ${
+                activeTab === 'assets' 
+                  ? 'bg-accent-50 border-accent-200/55 text-accent-600 shadow-accent-glow' 
+                  : 'border-transparent text-primary-600 hover:text-primary-950 hover:bg-primary-100/40'
               }`}
             >
-              🏢 Municipal Assets
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-accent-500">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v3m0 0h5.25m0 0v-3.75c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21" />
+              </svg>
+              <span>Municipal Assets</span>
             </button>
+            
             <button
               onClick={() => setActiveTab('complaints')}
-              className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'complaints' ? 'bg-accent-500 text-white shadow-lg' : 'text-primary-300 hover:bg-primary-800'
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-3 border ${
+                activeTab === 'complaints' 
+                  ? 'bg-accent-50 border-accent-200/55 text-accent-600 shadow-accent-glow' 
+                  : 'border-transparent text-primary-600 hover:text-primary-950 hover:bg-primary-100/40'
               }`}
             >
-              ⚠️ Citizen Complaints
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-red-500">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+              <span>Citizen Complaints</span>
             </button>
+            
             <button
               onClick={() => setActiveTab('orders')}
-              className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'orders' ? 'bg-accent-500 text-white shadow-lg' : 'text-primary-300 hover:bg-primary-800'
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-3 border ${
+                activeTab === 'orders' 
+                  ? 'bg-accent-50 border-accent-200/55 text-accent-600 shadow-accent-glow' 
+                  : 'border-transparent text-primary-600 hover:text-primary-950 hover:bg-primary-100/40'
               }`}
             >
-              🛠️ Work Orders
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-cyber-teal">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A1.75 1.75 0 1114.75 23.5l-5.83-5.83M11.42 15.17l2.42-2.42M11.42 15.17L9 12.75M13.84 12.75l2.42-2.42M13.84 12.75L11.42 10.33M11.42 10.33l2.42-2.42M11.42 10.33L9 7.91M9 7.91l2.42-2.42M9 7.91L6.58 5.5" />
+              </svg>
+              <span>Work Orders</span>
             </button>
+            
             <button
               onClick={() => setActiveTab('maintenance')}
-              className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'maintenance' ? 'bg-accent-500 text-white shadow-lg' : 'text-primary-300 hover:bg-primary-800'
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-3 border ${
+                activeTab === 'maintenance' 
+                  ? 'bg-accent-50 border-accent-200/55 text-accent-600 shadow-accent-glow' 
+                  : 'border-transparent text-primary-600 hover:text-primary-950 hover:bg-primary-100/40'
               }`}
             >
-              ⚙️ Maintenance Logs
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-amber-500">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Maintenance Logs</span>
             </button>
           </nav>
         </div>
@@ -198,164 +371,368 @@ function Dashboard() {
         {/* Logout Section */}
         <button
           onClick={handleLogout}
-          className="w-full bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-red-200 font-semibold py-2.5 rounded-lg text-sm transition-all cursor-pointer"
+          className="w-full bg-red-50 hover:bg-red-600 border border-red-200 text-red-600 hover:text-white font-bold py-3 rounded-xl text-xs transition-all cursor-pointer shadow-sm flex items-center justify-center space-x-2"
         >
-          Sign Out
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+          </svg>
+          <span>Sign Out</span>
         </button>
       </aside>
 
       {/* 2. Main Content Window */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
         
-        {/* Active View: Assets Manager */}
-        {activeTab === 'assets' && (
-          <div className="flex-1 flex overflow-hidden">
+        {/* Active View: Assets and Complaints Dashboard */}
+        {(activeTab === 'assets' || activeTab === 'complaints') && (
+          <div className="flex-1 flex overflow-hidden gap-4">
             
-            {/* Left Side: Search, Filter, list of assets */}
-            <div className="w-96 bg-primary-900/40 border-r border-primary-800/60 flex flex-col p-6 overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold">Assets Register</h3>
-                
-                {/* Add Asset Button (Admins & Officers only) */}
-                {(currentUser?.role === 'ADMIN' || currentUser?.role === 'OFFICER') && (
-                  <button
-                    onClick={() => {
-                      // Attempt to pre-fill active user's department
-                      setNewDeptId(currentUser.departmentId || (departments.length > 0 ? departments[0].id : ''));
-                      setShowAddModal(true);
-                    }}
-                    className="bg-accent-500 hover:bg-accent-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                  >
-                    + Add Asset
-                  </button>
-                )}
-              </div>
+            {/* Sidebar list section */}
+            <div className="w-96 bg-white/90 backdrop-blur-xl border border-primary-200/80 rounded-2xl flex flex-col p-6 overflow-hidden z-10 shadow-soft">
+              
+              {/* Assets Sidebar Panel */}
+              {activeTab === 'assets' && (
+                <>
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold tracking-tight text-primary-900">Assets Register</h3>
+                    {(currentUser?.role === 'ADMIN' || currentUser?.role === 'OFFICER') && (
+                      <button
+                        onClick={() => {
+                          setNewDeptId(currentUser.departmentId || (departments.length > 0 ? departments[0].id : ''));
+                          setShowAddModal(true);
+                        }}
+                        className="bg-gradient-to-r from-accent-600 to-accent-500 hover:from-accent-500 hover:to-accent-400 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-accent-600/10 flex items-center space-x-1"
+                      >
+                        <span>+ Add Asset</span>
+                      </button>
+                    )}
+                  </div>
 
-              {/* Search & Filter Options */}
-              <div className="space-y-4 mb-6">
-                <input
-                  type="text"
-                  placeholder="Search assets..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full bg-primary-900 border border-primary-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent-500"
-                />
-
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="bg-primary-900 border border-primary-800 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="OPERATIONAL">Operational</option>
-                    <option value="UNDER_MAINTENANCE">Maintenance</option>
-                    <option value="DAMAGED">Damaged</option>
-                    <option value="INACTIVE">Inactive</option>
-                  </select>
-
-                  <select
-                    value={conditionFilter}
-                    onChange={(e) => setConditionFilter(e.target.value)}
-                    className="bg-primary-900 border border-primary-800 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
-                  >
-                    <option value="">All Conditions</option>
-                    <option value="EXCELLENT">Excellent</option>
-                    <option value="GOOD">Good</option>
-                    <option value="FAIR">Fair</option>
-                    <option value="POOR">Poor</option>
-                    <option value="CRITICAL">Critical</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Assets List */}
-              <div className="flex-1 space-y-3 overflow-y-auto">
-                {loading && <p className="text-sm text-primary-400">Loading assets...</p>}
-                {!loading && filteredAssets.length === 0 && <p className="text-sm text-primary-400">No assets found.</p>}
-                
-                {filteredAssets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    onClick={() => {
-                      setSelectedAsset(asset);
-                      setMapCenter([asset.latitude, asset.longitude]);
-                    }}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer text-left ${
-                      selectedAsset?.id === asset.id 
-                        ? 'bg-primary-800 border-accent-500' 
-                        : 'bg-primary-900/60 border-primary-800 hover:border-primary-700'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <h4 className="font-bold text-sm truncate w-40">{asset.name}</h4>
-                      <span className="text-[10px] font-mono text-primary-400">{asset.id}</span>
+                  <div className="space-y-3 mb-6">
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-primary-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.636z" />
+                        </svg>
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Search assets..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full bg-white border border-primary-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-primary-900 placeholder-primary-400 focus:outline-none focus:border-accent-500 transition-colors"
+                      />
                     </div>
-                    <p className="text-xs text-primary-300 mt-1">{asset.assetType}</p>
-                    
-                    <div className="flex space-x-2 mt-3">
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                        asset.status === 'OPERATIONAL' ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400'
-                      }`}>
-                        {asset.status.replace('_', ' ')}
-                      </span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase bg-primary-800 text-primary-300">
-                        {asset.condition}
-                      </span>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="bg-white border border-primary-200 rounded-xl px-2.5 py-2 text-xs focus:outline-none text-primary-800 focus:border-accent-500"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="OPERATIONAL">Operational</option>
+                        <option value="UNDER_MAINTENANCE">Maintenance</option>
+                        <option value="DAMAGED">Damaged</option>
+                        <option value="INACTIVE">Inactive</option>
+                      </select>
+
+                      <select
+                        value={conditionFilter}
+                        onChange={(e) => setConditionFilter(e.target.value)}
+                        className="bg-white border border-primary-200 rounded-xl px-2.5 py-2 text-xs focus:outline-none text-primary-800 focus:border-accent-500"
+                      >
+                        <option value="">All Conditions</option>
+                        <option value="EXCELLENT">Excellent</option>
+                        <option value="GOOD">Good</option>
+                        <option value="FAIR">Fair</option>
+                        <option value="POOR">Poor</option>
+                        <option value="CRITICAL">Critical</option>
+                      </select>
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">
+                    {loading && <p className="text-xs text-primary-500 text-center py-8">Loading assets...</p>}
+                    {!loading && filteredAssets.length === 0 && <p className="text-xs text-primary-500 text-center py-8">No assets found.</p>}
+                    
+                    {filteredAssets.map((asset) => (
+                      <div
+                        key={asset.id}
+                        onClick={() => {
+                          setSelectedAsset(asset);
+                          setMapCenter([asset.latitude, asset.longitude]);
+                        }}
+                        className={`p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
+                          selectedAsset?.id === asset.id 
+                            ? 'bg-white border-accent-500 shadow-medium shadow-accent-500/5' 
+                            : 'bg-white/40 border-primary-200/80 hover:bg-white hover:border-primary-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-bold text-xs text-primary-900 truncate w-40">{asset.name}</h4>
+                          <span className="text-[9px] font-mono font-bold text-primary-500 bg-primary-100/50 px-1.5 py-0.5 rounded border border-primary-200">{asset.id}</span>
+                        </div>
+                        <p className="text-[10px] text-primary-500 mt-1 flex items-center">
+                          <span className="w-1 h-1 rounded-full bg-primary-400 mr-1.5"></span>
+                          {asset.assetType}
+                        </p>
+                        
+                        <div className="flex space-x-2 mt-3">
+                          <span className={`text-[8px] px-2 py-0.5 rounded-full font-bold uppercase border ${
+                            asset.status === 'OPERATIONAL' 
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                              : 'bg-amber-50 border-amber-200 text-amber-700'
+                          }`}>
+                            {asset.status.replace('_', ' ')}
+                          </span>
+                          <span className="text-[8px] px-2 py-0.5 rounded-full font-bold uppercase bg-primary-100 border border-primary-200 text-primary-600">
+                            {asset.condition}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Complaints Sidebar Panel */}
+              {activeTab === 'complaints' && (
+                <>
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold tracking-tight text-primary-900">Complaints Queue</h3>
+                    <button
+                      onClick={() => {
+                        setError('');
+                        setShowComplaintModal(true);
+                      }}
+                      className="bg-gradient-to-r from-accent-600 to-accent-500 hover:from-accent-500 hover:to-accent-400 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-accent-600/10 flex items-center space-x-1"
+                    >
+                      <span>+ File Complaint</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 mb-6">
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-primary-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.636z" />
+                        </svg>
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Search complaints..."
+                        value={searchComplaint}
+                        onChange={(e) => setSearchComplaint(e.target.value)}
+                        className="w-full bg-white border border-primary-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-primary-900 placeholder-primary-400 focus:outline-none focus:border-accent-500 transition-colors"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={statusComplaintFilter}
+                        onChange={(e) => setStatusComplaintFilter(e.target.value)}
+                        className="bg-white border border-primary-200 rounded-xl px-2.5 py-2 text-xs focus:outline-none text-primary-800 focus:border-accent-500"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="SUBMITTED">Submitted</option>
+                        <option value="UNDER_REVIEW">Under Review</option>
+                        <option value="ASSIGNED">Assigned</option>
+                        <option value="IN_PROGRESS">In Progress</option>
+                        <option value="RESOLVED">Resolved</option>
+                        <option value="VERIFIED">Verified</option>
+                        <option value="CLOSED">Closed</option>
+                      </select>
+
+                      <select
+                        value={categoryComplaintFilter}
+                        onChange={(e) => setCategoryComplaintFilter(e.target.value)}
+                        className="bg-white border border-primary-200 rounded-xl px-2.5 py-2 text-xs focus:outline-none text-primary-800 focus:border-accent-500"
+                      >
+                        <option value="">All Categories</option>
+                        <option value="Streetlight">Streetlight</option>
+                        <option value="Road">Road</option>
+                        <option value="Water Pipeline">Water Pipeline</option>
+                        <option value="Transformer">Transformer</option>
+                        <option value="Public Park">Public Park</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">
+                    {loading && <p className="text-xs text-primary-500 text-center py-8">Loading complaints...</p>}
+                    {!loading && filteredComplaints.length === 0 && <p className="text-xs text-primary-500 text-center py-8">No complaints logged.</p>}
+                    
+                    {filteredComplaints.map((comp) => (
+                      <div
+                        key={comp.id}
+                        onClick={() => {
+                          setSelectedComplaint(comp);
+                          setMapCenter([comp.latitude, comp.longitude]);
+                        }}
+                        className={`p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
+                          selectedComplaint?.id === comp.id 
+                            ? 'bg-white border-accent-500 shadow-medium shadow-accent-500/5' 
+                            : 'bg-white/40 border-primary-200/80 hover:bg-white hover:border-primary-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-bold text-xs text-primary-900 truncate w-40">{comp.category}</h4>
+                          <span className="text-[9px] font-mono font-bold text-primary-500 bg-primary-100/50 px-1.5 py-0.5 rounded border border-primary-200">{comp.id}</span>
+                        </div>
+                        <p className="text-[10px] text-primary-600 mt-1.5 italic line-clamp-2">"{comp.description}"</p>
+                        
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <span className={`text-[8px] px-2 py-0.5 rounded-full font-bold uppercase border ${
+                            comp.status === 'SUBMITTED' ? 'bg-primary-100 border-primary-200 text-primary-600' :
+                            comp.status === 'UNDER_REVIEW' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                            ['RESOLVED', 'VERIFIED', 'CLOSED'].includes(comp.status) ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'
+                          }`}>
+                            {comp.status.replace('_', ' ')}
+                          </span>
+                          <span className={`text-[8px] px-2 py-0.5 rounded-full font-bold uppercase border ${
+                            comp.severity === 'HIGH' ? 'bg-red-50 border-red-200 text-red-700' :
+                            comp.severity === 'MEDIUM' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-primary-100 border-primary-200 text-primary-500'
+                          }`}>
+                            {comp.severity} Severity
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Right Side: Leaflet GIS Map + Detail Drawer */}
-            <div className="flex-1 flex flex-col relative h-full">
+            <div className="flex-1 flex flex-col relative h-full rounded-2xl overflow-hidden shadow-medium border border-primary-200/80 bg-white">
               
               {/* GIS Map Container */}
-              <div className="flex-1 w-full h-full relative">
+              <div className="flex-1 w-full h-full relative z-0">
                 <AssetMap 
                   assets={filteredAssets} 
+                  complaints={filteredComplaints}
                   selectedAsset={selectedAsset} 
-                  onSelectAsset={setSelectedAsset} 
+                  selectedComplaint={selectedComplaint}
+                  onSelectAsset={setSelectedAsset}
+                  onSelectComplaint={setSelectedComplaint}
                   mapCenter={mapCenter} 
+                  mode={activeTab}
+                  isPickingCoords={isPickingCoords}
+                  onMapClick={handleMapClick}
                 />
               </div>
 
               {/* Selected Asset Detail Overlay (Drawer) */}
-              {selectedAsset && (
-                <div className="absolute bottom-6 left-6 right-6 bg-primary-900/95 backdrop-blur-md p-6 rounded-2xl border border-primary-800 shadow-2xl z-10 text-left flex justify-between items-start">
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-xs font-mono text-accent-400">{selectedAsset.id}</span>
-                      <h3 className="text-xl font-bold text-white">{selectedAsset.name}</h3>
+              {activeTab === 'assets' && selectedAsset && (
+                <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-xl p-5 rounded-2xl border border-primary-200 shadow-2xl z-10 text-left flex justify-between items-center gap-6 animate-fade-in">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-[10px] font-bold font-mono text-accent-700 bg-accent-50 px-2 py-0.5 rounded border border-accent-100">{selectedAsset.id}</span>
+                      <h3 className="text-lg font-bold text-primary-900 tracking-tight">{selectedAsset.name}</h3>
                     </div>
-                    <p className="text-sm text-primary-300 max-w-xl">{selectedAsset.description || 'No description provided.'}</p>
+                    <p className="text-xs text-primary-600 max-w-2xl">{selectedAsset.description || 'No description provided.'}</p>
                     
-                    <div className="flex flex-wrap gap-4 text-xs text-primary-400 pt-2">
-                      <div>Type: <strong className="text-white">{selectedAsset.assetType}</strong></div>
-                      <div>Status: <strong className="text-white">{selectedAsset.status}</strong></div>
-                      <div>Condition: <strong className="text-white">{selectedAsset.condition}</strong></div>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-primary-500 pt-1">
+                      <div>Type: <strong className="text-primary-800 font-semibold">{selectedAsset.assetType}</strong></div>
+                      <div>Status: <strong className="text-primary-800 font-semibold">{selectedAsset.status}</strong></div>
+                      <div>Condition: <strong className="text-primary-800 font-semibold">{selectedAsset.condition}</strong></div>
                       {selectedAsset.estimatedValue && (
-                        <div>Value: <strong className="text-white">${selectedAsset.estimatedValue}</strong></div>
+                        <div>Value: <strong className="text-emerald-600 font-semibold">${selectedAsset.estimatedValue.toLocaleString()}</strong></div>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex flex-col space-y-2">
-                    <button
-                      onClick={() => setSelectedAsset(null)}
-                      className="bg-primary-800 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer"
-                    >
-                      Close Details
-                    </button>
+                  <div className="flex space-x-2 flex-shrink-0">
                     {currentUser?.role === 'ADMIN' && (
                       <button
                         onClick={() => handleDelete(selectedAsset.id)}
-                        className="bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-red-300 px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer"
+                        className="bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/30 hover:border-transparent transition-all px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer"
                       >
                         Delete Asset
                       </button>
                     )}
+                    <button
+                      onClick={() => setSelectedAsset(null)}
+                      className="bg-primary-100 hover:bg-primary-200 text-primary-700 border border-primary-200 transition-all px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Complaint Detail Overlay (Drawer) */}
+              {activeTab === 'complaints' && selectedComplaint && (
+                <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-xl p-5 rounded-2xl border border-primary-200 shadow-2xl z-10 text-left flex gap-6 items-center justify-between animate-fade-in">
+                  <div className="flex gap-5 items-center min-w-0">
+                    {/* Thumbnail attachment if exists */}
+                    {selectedComplaint.imageUrl && (
+                      <div className="w-20 h-20 bg-primary-100 rounded-xl overflow-hidden border border-primary-200 flex-shrink-0 shadow-sm">
+                        <img 
+                          src={getImageUrl(selectedComplaint.imageUrl)} 
+                          alt="Complaint attachment" 
+                          className="w-full h-full object-cover hover:scale-110 transition-transform duration-300 cursor-pointer"
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[10px] font-bold font-mono text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">{selectedComplaint.id}</span>
+                        <h3 className="text-lg font-bold text-primary-900 tracking-tight">{selectedComplaint.category} Issue</h3>
+                      </div>
+                      <p className="text-xs text-primary-600 italic line-clamp-2">"{selectedComplaint.description}"</p>
+                      
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-primary-500 pt-1">
+                        <div>Severity: <strong className={`font-semibold ${selectedComplaint.severity === 'HIGH' ? 'text-red-600' : 'text-primary-800'}`}>{selectedComplaint.severity}</strong></div>
+                        <div>Status: <strong className="text-primary-850 font-semibold">{selectedComplaint.status.replace('_', ' ')}</strong></div>
+                        {selectedComplaint.citizen && (
+                          <div>Reported By: <strong className="text-primary-800 font-semibold">{selectedComplaint.citizen.firstName} {selectedComplaint.citizen.lastName}</strong></div>
+                        )}
+                        {selectedComplaint.department && (
+                          <div>Dept: <strong className="text-accent-600 font-semibold">{selectedComplaint.department.name}</strong></div>
+                        )}
+                      </div>
+
+                      {/* Officer action drop-down */}
+                      {['ADMIN', 'OFFICER'].includes(currentUser?.role) && (
+                        <div className="flex items-center space-x-2.5 mt-2 pt-2 border-t border-primary-100">
+                          <span className="text-[10px] text-primary-500 font-bold uppercase tracking-wider">Update Status:</span>
+                          <select
+                            value={selectedComplaint.status}
+                            onChange={(e) => handleComplaintStatusUpdate(selectedComplaint.id, e.target.value)}
+                            className="bg-white border border-primary-200 rounded-lg px-2.5 py-1 text-xs text-primary-900 focus:outline-none focus:border-accent-500"
+                          >
+                            <option value="SUBMITTED">Submitted</option>
+                            <option value="UNDER_REVIEW">Under Review</option>
+                            <option value="ASSIGNED">Assigned</option>
+                            <option value="IN_PROGRESS">In Progress</option>
+                            <option value="RESOLVED">Resolved</option>
+                            <option value="VERIFIED">Verified</option>
+                            <option value="CLOSED">Closed</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-2 flex-shrink-0">
+                    {currentUser?.role === 'ADMIN' && (
+                      <button
+                        onClick={() => handleDeleteComplaint(selectedComplaint.id)}
+                        className="bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/30 hover:border-transparent transition-all px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer"
+                      >
+                        Delete Complaint
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setSelectedComplaint(null)}
+                      className="bg-primary-100 hover:bg-primary-200 text-primary-700 border border-primary-200 transition-all px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      Close
+                    </button>
                   </div>
                 </div>
               )}
@@ -364,58 +741,66 @@ function Dashboard() {
         )}
 
         {/* Active View: Other tabs (Under Maintenance) */}
-        {activeTab !== 'assets' && (
-          <div className="flex-1 flex items-center justify-center p-12 bg-primary-950">
-            <div className="glass-panel p-10 max-w-md w-full text-center border-t-4 border-t-accent-500 shadow-2xl space-y-6">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-accent-500/10 text-accent-400 border border-accent-500/20">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 animate-pulse">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A1.75 1.75 0 1114.75 23.5l-5.83-5.83M11.42 15.17l2.42-2.42M11.42 15.17L9 12.75M13.84 12.75l2.42-2.42M13.84 12.75L11.42 10.33M11.42 10.33l2.42-2.42M11.42 10.33L9 7.91M9 7.91l2.42-2.42M9 7.91L6.58 5.5M6.58 5.5a1.75 1.75 0 112.5-2.5L14.91 8.83a1.75 1.75 0 11-2.5 2.5L6.58 5.5z" />
+        {activeTab !== 'assets' && activeTab !== 'complaints' && (
+          <div className="flex-1 flex items-center justify-center p-12 bg-primary-100/10">
+            <div className="glass-panel p-10 max-w-md w-full text-center border-t-2 border-t-accent-500 shadow-medium space-y-6 animate-fade-in bg-white">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent-50 text-accent-600 border border-accent-100">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8 animate-pulse">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A1.75 1.75 0 1114.75 23.5l-5.83-5.83M11.42 15.17l2.42-2.42M11.42 15.17L9 12.75M13.84 12.75l2.42-2.42M13.84 12.75L11.42 10.33M11.42 10.33l2.42-2.42M11.42 10.33L9 7.91M9 7.91l2.42-2.42M9 7.91L6.58 5.5" />
                 </svg>
               </div>
 
               <div>
-                <h2 className="text-2xl font-bold tracking-tight text-white mb-2">Under Maintenance</h2>
-                <p className="text-primary-300 text-sm">
-                  The <strong className="text-accent-400 uppercase tracking-wide">{activeTab}</strong> module is currently undergoing system repairs. 
-                  Please check back shortly!
+                <h2 className="text-xl font-bold tracking-tight text-primary-900 mb-2">Module Under Construction</h2>
+                <p className="text-primary-600 text-xs leading-relaxed">
+                  The <strong className="text-accent-600 uppercase tracking-wider">{activeTab}</strong> component is currently undergoing visual re-engineering to fit light layouts.
                 </p>
               </div>
 
-              <div className="bg-primary-900/60 rounded-xl p-4 border border-primary-800 text-xs font-mono text-primary-400 flex justify-between items-center">
-                <span>Error Code: 503_MAINTENANCE</span>
-                <span className="text-accent-400 font-bold uppercase tracking-widest">Repairing</span>
+              <div className="bg-primary-50 rounded-xl p-3.5 border border-primary-200/80 text-[10px] font-mono text-primary-500 flex justify-between items-center">
+                <span>Code: 503_MAINTENANCE</span>
+                <span className="text-accent-600 font-extrabold uppercase tracking-widest text-[9px]">Active Upgrades</span>
               </div>
             </div>
           </div>
         )}
       </main>
 
-      {/* 3. Add Asset Modal (Visible when showAddModal is true) */}
+      {/* 3. Add Asset Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-panel p-8 max-w-lg w-full border-t-4 border-t-accent-500 shadow-2xl relative text-left">
-            <h3 className="text-2xl font-bold mb-6">Create New Municipal Asset</h3>
+        <div className="fixed inset-0 bg-primary-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel p-8 max-w-lg w-full border-t-2 border-t-accent-500 shadow-2xl relative text-left bg-white animate-fade-in">
+            <h3 className="text-xl font-extrabold mb-6 tracking-tight text-primary-900">Create New Municipal Asset</h3>
             
+            {error && (
+              <div className="bg-danger/5 border border-danger/25 text-danger text-xs rounded-xl p-4 mb-4 flex items-center space-x-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-danger flex-shrink-0">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+                <span className="font-semibold">{error}</span>
+              </div>
+            )}
+
             <form onSubmit={handleAddAsset} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-primary-300 uppercase tracking-wider mb-2">Asset Name</label>
+                  <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Asset Name</label>
                   <input
                     type="text"
                     required
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    className="w-full bg-primary-900 border border-primary-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent-500"
+                    className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-900 text-xs focus:outline-none focus:border-accent-500 placeholder-primary-400"
                     placeholder="E.g., North Main Pipeline"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-primary-300 uppercase tracking-wider mb-2">Asset Type</label>
+                  <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Asset Type</label>
                   <select
                     value={newType}
                     onChange={(e) => setNewType(e.target.value)}
-                    className="w-full bg-primary-900 border border-primary-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent-500"
+                    className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-950 text-xs focus:outline-none focus:border-accent-500"
                   >
                     <option value="Streetlight">Streetlight</option>
                     <option value="Road">Road</option>
@@ -427,60 +812,60 @@ function Dashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-primary-300 uppercase tracking-wider mb-2">Description</label>
+                <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Description</label>
                 <textarea
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  className="w-full bg-primary-900 border border-primary-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent-500 h-20"
+                  className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-900 text-xs focus:outline-none focus:border-accent-500 h-20 placeholder-primary-400"
                   placeholder="Enter condition notes or installation details..."
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-primary-300 uppercase tracking-wider mb-2">Latitude</label>
+                  <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Latitude</label>
                   <input
                     type="number"
                     step="0.000001"
                     required
                     value={newLat}
                     onChange={(e) => setNewLat(e.target.value)}
-                    className="w-full bg-primary-900 border border-primary-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent-500"
+                    className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-900 text-xs focus:outline-none focus:border-accent-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-primary-300 uppercase tracking-wider mb-2">Longitude</label>
+                  <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Longitude</label>
                   <input
                     type="number"
                     step="0.000001"
                     required
                     value={newLng}
                     onChange={(e) => setNewLng(e.target.value)}
-                    className="w-full bg-primary-900 border border-primary-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent-500"
+                    className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-900 text-xs focus:outline-none focus:border-accent-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-primary-300 uppercase tracking-wider mb-2">Estimated Value ($)</label>
+                  <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Estimated Value ($)</label>
                   <input
                     type="number"
                     value={newValue}
                     onChange={(e) => setNewValue(e.target.value)}
-                    className="w-full bg-primary-900 border border-primary-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent-500"
-                    placeholder="5000"
+                    className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-900 text-xs focus:outline-none focus:border-accent-500 placeholder-primary-400"
+                    placeholder="E.g., 5000"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-primary-300 uppercase tracking-wider mb-2">Warranty Info</label>
+                  <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Warranty Info</label>
                   <input
                     type="text"
                     value={newWarranty}
                     onChange={(e) => setNewWarranty(e.target.value)}
-                    className="w-full bg-primary-900 border border-primary-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent-500"
+                    className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-900 text-xs focus:outline-none focus:border-accent-500 placeholder-primary-400"
                     placeholder="E.g., 2 Year Standard"
                   />
                 </div>
@@ -488,12 +873,12 @@ function Dashboard() {
 
               {/* Department Selector */}
               <div>
-                <label className="block text-xs font-bold text-primary-300 uppercase tracking-wider mb-2">Department</label>
+                <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Department</label>
                 <select
                   required
                   value={newDeptId}
                   onChange={(e) => setNewDeptId(e.target.value)}
-                  className="w-full bg-primary-900 border border-primary-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent-500"
+                  className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-900 text-xs focus:outline-none focus:border-accent-500"
                 >
                   {departments.length === 0 && <option value="">Loading departments...</option>}
                   {departments.map((dept) => (
@@ -504,19 +889,176 @@ function Dashboard() {
                 </select>
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4">
+              <div className="flex justify-end space-x-3 pt-4 border-t border-primary-100">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="bg-primary-800 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer"
+                  className="bg-primary-100 hover:bg-primary-200 text-primary-700 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-primary-200"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer"
+                  className="bg-gradient-to-r from-accent-600 to-accent-500 hover:from-accent-500 hover:to-accent-400 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg shadow-accent-600/10"
                 >
                   Create Asset
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Add Complaint Modal */}
+      {showComplaintModal && (
+        <div className="fixed inset-0 bg-primary-950/45 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel p-8 max-w-lg w-full border-t-2 border-t-accent-500 shadow-2xl relative text-left bg-white animate-fade-in">
+            <h3 className="text-xl font-extrabold mb-6 tracking-tight text-primary-900">File New Citizen Complaint</h3>
+            
+            {error && (
+              <div className="bg-danger/5 border border-danger/25 text-danger text-xs rounded-xl p-4 mb-4 flex items-center space-x-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-danger flex-shrink-0">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+                <span className="font-semibold">{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleFileComplaint} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Category</label>
+                  <select
+                    value={compCategory}
+                    onChange={(e) => setCompCategory(e.target.value)}
+                    className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-950 text-xs focus:outline-none focus:border-accent-500"
+                  >
+                    <option value="Streetlight">Streetlight</option>
+                    <option value="Road">Road</option>
+                    <option value="Water Pipeline">Water Pipeline</option>
+                    <option value="Transformer">Transformer</option>
+                    <option value="Public Park">Public Park</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Severity</label>
+                  <select
+                    value={compSeverity}
+                    onChange={(e) => setCompSeverity(e.target.value)}
+                    className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-950 text-xs focus:outline-none focus:border-accent-500"
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Description</label>
+                <textarea
+                  required
+                  value={compDesc}
+                  onChange={(e) => setCompDesc(e.target.value)}
+                  className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-900 text-xs focus:outline-none focus:border-accent-500 h-24 placeholder-primary-400"
+                  placeholder="Describe the issue in detail (e.g. flickering, leakages, size of potholes)..."
+                />
+              </div>
+
+              {/* Coordinates with map picker trigger */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Latitude</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    required
+                    value={compLat}
+                    onChange={(e) => setCompLat(e.target.value)}
+                    className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-900 text-xs focus:outline-none focus:border-accent-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Longitude</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    required
+                    value={compLng}
+                    onChange={(e) => setCompLng(e.target.value)}
+                    className="w-full bg-white border border-primary-200 rounded-xl px-4 py-2.5 text-primary-900 text-xs focus:outline-none focus:border-accent-500"
+                  />
+                </div>
+              </div>
+
+              {/* Action row to pick from map */}
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowComplaintModal(false);
+                    setIsPickingCoords(true);
+                  }}
+                  className="bg-accent-50 hover:bg-accent-100 border border-accent-200 text-accent-700 px-4 py-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center space-x-1.5"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5 text-accent-600">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                  </svg>
+                  <span>Pick Coordinates From Map</span>
+                </button>
+              </div>
+
+              {/* Attachment field */}
+              <div className="pt-2">
+                <label className="block text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2">Upload Photo Attachment</label>
+                <div className="border border-dashed border-primary-200 hover:border-accent-500/50 rounded-xl p-4 transition-all bg-primary-50/50 text-center relative cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="flex flex-col items-center space-y-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-primary-400">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+                    </svg>
+                    <span className="text-[11px] text-primary-700 font-bold">Click or drag photo file to upload</span>
+                    <span className="text-[9px] text-primary-400">Supports PNG, JPG, JPEG</span>
+                  </div>
+                </div>
+                
+                {compImage && (
+                  <div className="mt-3 flex items-center justify-between bg-primary-100/50 p-2.5 rounded-xl border border-primary-200">
+                    <span className="text-[11px] text-primary-700 truncate w-60">📷 Photo Attachment Attached</span>
+                    <button
+                      type="button"
+                      onClick={() => setCompImage(null)}
+                      className="text-red-500 hover:text-red-700 text-xs font-bold cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-primary-100">
+                <button
+                  type="button"
+                  onClick={() => setShowComplaintModal(false)}
+                  className="bg-primary-100 hover:bg-primary-200 text-primary-700 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-primary-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-gradient-to-r from-accent-600 to-accent-500 hover:from-accent-500 hover:to-accent-400 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg shadow-accent-600/10"
+                >
+                  File Complaint
                 </button>
               </div>
             </form>
