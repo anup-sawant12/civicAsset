@@ -122,6 +122,12 @@ export default function AssetMap({
           
           if (isNaN(lat) || isNaN(lng)) return null;
 
+          const photoLink = complaint.imageUrl ? (
+            complaint.imageUrl.startsWith('http://') || complaint.imageUrl.startsWith('https://') || complaint.imageUrl.startsWith('data:')
+              ? complaint.imageUrl
+              : `${(import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace('/api', '')}${complaint.imageUrl.startsWith('/') ? complaint.imageUrl : '/' + complaint.imageUrl}`
+          ) : null;
+
           return (
             <Marker 
               key={complaint.id} 
@@ -136,9 +142,33 @@ export default function AssetMap({
               }}
             >
               <Popup>
-                <div className="text-slate-900 p-1 min-w-[160px]">
+                <div className="text-slate-900 p-1 min-w-[180px] max-w-[220px]">
                   <span className="text-[10px] font-bold font-mono text-red-600 block uppercase mb-0.5">{complaint.id}</span>
                   <h4 className="font-bold text-sm mb-1 text-slate-800 leading-tight">{complaint.category}</h4>
+                  
+                  {photoLink && (
+                    <div className="my-1.5 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
+                      <img 
+                        src={photoLink} 
+                        alt="Evidence photo"
+                        className="w-full h-24 object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                        onClick={() => window.open(photoLink, '_blank', 'noopener,noreferrer')}
+                      />
+                      <div className="py-1 px-1.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-[9px] text-slate-500 font-medium">Public Photo</span>
+                        <a
+                          href={photoLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-indigo-600 font-bold hover:text-indigo-800 flex items-center gap-0.5"
+                          title="Open photo link in new tab"
+                        >
+                          <span>Open Link ↗</span>
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex flex-col gap-0.5 text-xs text-slate-600">
                     <p className="italic text-slate-500 mb-1 truncate">"{complaint.description}"</p>
                     <div>Severity: <span className="font-semibold text-slate-800">{complaint.severity}</span></div>

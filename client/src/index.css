@@ -50,22 +50,25 @@ body {
 
 /* Leaflet Map Light Styles */
 .leaflet-container {
-  font-family: inherit !important;
-  @apply rounded-2xl border border-primary-200 shadow-medium overflow-hidden !important;
+  font-family: inherit;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+  overflow: hidden;
 }
 
 .leaflet-bar {
-  @apply border-primary-200/80 !important;
-  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(10px);
 }
 
 .leaflet-bar a {
-  background: transparent !important;
-  color: #1e293b !important;
-  @apply border-b border-primary-200/80 !important;
+  background: transparent;
+  color: #1e293b;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
 }
 
 .leaflet-bar a:hover {
-  background: rgba(37, 99, 235, 0.08) !important;
+  background: rgba(37, 99, 235, 0.08);
 }

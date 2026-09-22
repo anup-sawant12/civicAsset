@@ -1,42 +1,29 @@
 import prisma from '../config/prisma.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Helper to decode base64 image and save to file system
-const saveBase64Image = (base64Str) => {
-  if (!base64Str || !base64Str.startsWith('data:image/')) {
+// Helper to process complaint image: web URLs, domain links, or base64 data URLs directly with ZERO disk storage
+const processComplaintImage = (imageUrl) => {
+  if (!imageUrl || typeof imageUrl !== 'string') {
     return null;
   }
+  const trimmed = imageUrl.trim();
+  if (trimmed === '') return null;
 
-  try {
-    const matches = base64Str.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return null;
-    }
-
-    const ext = matches[1].split('/')[1] || 'png';
-    const buffer = Buffer.from(matches[2], 'base64');
-    const filename = `cmp-${Date.now()}-${Math.floor(Math.random() * 1000)}.${ext}`;
-    
-    // Save inside server/uploads/complaints directory
-    const uploadsDir = path.join(__dirname, '../../uploads/complaints');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
-    const filePath = path.join(uploadsDir, filename);
-    fs.writeFileSync(filePath, buffer);
-
-    // Return the relative URL path to be saved in DB
-    return `/uploads/complaints/${filename}`;
-  } catch (error) {
-    console.error('Error saving image:', error);
-    return null;
+  // Web URL (accessible globally from any device)
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
   }
+
+  // Domain URL without scheme (e.g. www.example.com or i.imgur.com/...)
+  if (/^(www\.|[a-zA-Z0-9-]+\.[a-zA-Z]{2,})/.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+
+  // Base64 data string (stored directly in DB without creating files on disk)
+  if (trimmed.startsWith('data:image/')) {
+    return trimmed;
+  }
+
+  return trimmed;
 };
 
 export const createComplaint = async (req, res) => {
@@ -67,8 +54,8 @@ export const createComplaint = async (req, res) => {
       departmentId = worksDept?.id || null;
     }
 
-    // Process image upload
-    const savedImagePath = saveBase64Image(imageUrl);
+    // Process image: public URLs are saved directly so any computer can access it
+    const finalImageUrl = processComplaintImage(imageUrl);
 
     const newComplaint = await prisma.complaint.create({
       data: {
@@ -79,7 +66,7 @@ export const createComplaint = async (req, res) => {
         priority: 'MEDIUM',
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
-        imageUrl: savedImagePath,
+        imageUrl: finalImageUrl,
         citizenId,
         assetId: assetId || null,
         departmentId
@@ -154,7 +141,7 @@ export const getComplaintById = async (req, res) => {
 export const updateComplaint = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, priority, severity, assetId, departmentId, description, category } = req.body;
+    const { status, priority, severity, assetId, departmentId, description, category, imageUrl } = req.body;
     
     // Check if complaint exists
     const complaint = await prisma.complaint.findUnique({ where: { id } });
@@ -174,6 +161,7 @@ export const updateComplaint = async (req, res) => {
       if (['SUBMITTED', 'UNDER_REVIEW'].includes(complaint.status)) {
         if (description) updateData.description = description;
         if (category) updateData.category = category;
+        if (imageUrl !== undefined) updateData.imageUrl = processComplaintImage(imageUrl);
       } else {
         return res.status(400).json({ success: false, message: 'Cannot edit complaint details after progress has started.' });
       }
@@ -186,6 +174,7 @@ export const updateComplaint = async (req, res) => {
       if (departmentId !== undefined) updateData.departmentId = departmentId;
       if (description) updateData.description = description;
       if (category) updateData.category = category;
+      if (imageUrl !== undefined) updateData.imageUrl = processComplaintImage(imageUrl);
     }
 
     const updatedComplaint = await prisma.complaint.update({

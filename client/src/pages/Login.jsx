@@ -113,7 +113,35 @@ function Login() {
           </button>
         </form>
 
-        <div className="mt-8 text-center text-xs text-primary-500 font-medium">
+        {/* Quick Demo Credentials Selection */}
+        <div className="mt-6 pt-5 border-t border-primary-100">
+          <span className="block text-[10px] font-bold text-primary-400 uppercase tracking-widest text-center mb-2.5">
+            Quick Demo Logins (Click to Autofill):
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { role: 'Citizen', email: 'citizen@email.com', icon: '👤', color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
+              { role: 'Field Worker', email: 'worker@municipal.gov', icon: '👷', color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
+              { role: 'Officer', email: 'officer@municipal.gov', icon: '📋', color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
+              { role: 'Admin', email: 'admin@municipal.gov', icon: '⚡', color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' },
+            ].map((item) => (
+              <button
+                key={item.email}
+                type="button"
+                onClick={() => {
+                  setEmail(item.email);
+                  setPassword('password123');
+                }}
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer text-left ${item.color}`}
+              >
+                <span>{item.icon}</span>
+                <span className="truncate">{item.role}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 text-center text-xs text-primary-500 font-medium">
           Don't have an account?{' '}
           <Link to="/register" className="text-accent-600 hover:text-accent-500 font-bold transition-colors">
             Register as a Citizen

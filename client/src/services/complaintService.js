@@ -8,14 +8,29 @@ const getHeaders = () => {
   };
 };
 
+const handleResponse = async (response) => {
+  const data = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
+    throw new Error(data.message || 'Session expired. Please sign in again.');
+  }
+  if (!response.ok) {
+    throw new Error(data.message || 'Request failed');
+  }
+  return data;
+};
+
 export const getComplaints = async (filters = {}) => {
   const query = new URLSearchParams(filters).toString();
   const response = await fetch(`${API_URL}?${query}`, {
     method: 'GET',
     headers: getHeaders()
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Failed to fetch complaints');
+  const data = await handleResponse(response);
   return data.complaints;
 };
 
@@ -24,8 +39,7 @@ export const getComplaintById = async (id) => {
     method: 'GET',
     headers: getHeaders()
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Failed to fetch complaint');
+  const data = await handleResponse(response);
   return data.complaint;
 };
 
@@ -35,8 +49,7 @@ export const createComplaint = async (complaintData) => {
     headers: getHeaders(),
     body: JSON.stringify(complaintData)
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Failed to file complaint');
+  const data = await handleResponse(response);
   return data.complaint;
 };
 
@@ -46,8 +59,7 @@ export const updateComplaint = async (id, complaintData) => {
     headers: getHeaders(),
     body: JSON.stringify(complaintData)
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Failed to update complaint');
+  const data = await handleResponse(response);
   return data.complaint;
 };
 
@@ -56,7 +68,6 @@ export const deleteComplaint = async (id) => {
     method: 'DELETE',
     headers: getHeaders()
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Failed to delete complaint');
+  const data = await handleResponse(response);
   return data;
 };

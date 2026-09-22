@@ -9,6 +9,7 @@ import errorHandler from './middleware/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
 import complaintRoutes from './routes/complaintRoutes.js';
+import workOrderRoutes from './routes/workOrderRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,8 +22,10 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve static uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Fallback for any legacy mock complaints referencing local upload paths
+app.get('/uploads/complaints/:filename', (req, res) => {
+  res.redirect('https://images.unsplash.com/photo-1517420704952-d9f39e95b43e?auto=format&fit=crop&w=800&q=80');
+});
 
 // Health Check API
 app.get('/api/health', (req, res) => {
@@ -41,6 +44,9 @@ app.use('/api/assets', assetRoutes);
 
 // Complaint API Routes
 app.use('/api/complaints', complaintRoutes);
+
+// Work Order API Routes
+app.use('/api/work-orders', workOrderRoutes);
 
 // Error Handler Middleware
 app.use(errorHandler);

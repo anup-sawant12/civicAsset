@@ -1,4 +1,4 @@
-const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/assets`;
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/work-orders`;
 
 const getHeaders = () => {
   const token = localStorage.getItem('token');
@@ -24,59 +24,50 @@ const handleResponse = async (response) => {
   return data;
 };
 
-export const getAssets = async (filters = {}) => {
+export const getWorkOrders = async (filters = {}) => {
   const query = new URLSearchParams(filters).toString();
   const response = await fetch(`${API_URL}?${query}`, {
     method: 'GET',
     headers: getHeaders()
   });
   const data = await handleResponse(response);
-  return data.assets;
+  return data.workOrders;
 };
 
-export const getAssetById = async (id) => {
+export const getWorkOrderById = async (id) => {
   const response = await fetch(`${API_URL}/${id}`, {
     method: 'GET',
     headers: getHeaders()
   });
   const data = await handleResponse(response);
-  return data.asset;
+  return data.workOrder;
 };
 
-export const createAsset = async (assetData) => {
+export const createWorkOrder = async (orderData) => {
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify(assetData)
+    body: JSON.stringify(orderData)
   });
   const data = await handleResponse(response);
-  return data;
+  return data.workOrder;
 };
 
-export const updateAsset = async (id, assetData) => {
+export const updateWorkOrder = async (id, updateData) => {
   const response = await fetch(`${API_URL}/${id}`, {
     method: 'PUT',
     headers: getHeaders(),
-    body: JSON.stringify(assetData)
+    body: JSON.stringify(updateData)
   });
   const data = await handleResponse(response);
-  return data;
+  return data.workOrder;
 };
 
-export const deleteAsset = async (id) => {
-  const response = await fetch(`${API_URL}/${id}`, {
-    method: 'DELETE',
-    headers: getHeaders()
-  });
-  const data = await handleResponse(response);
-  return data;
-};
-
-export const getDepartments = async () => {
-  const response = await fetch(`${API_URL}/departments`, {
+export const getWorkers = async () => {
+  const response = await fetch(`${API_URL}/workers`, {
     method: 'GET',
     headers: getHeaders()
   });
   const data = await handleResponse(response);
-  return data.departments;
+  return data.workers;
 };
