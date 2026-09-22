@@ -2,10 +2,17 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import logger from './utils/logger.js';
 import errorHandler from './middleware/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
+import complaintRoutes from './routes/complaintRoutes.js';
+import workOrderRoutes from './routes/workOrderRoutes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -14,6 +21,11 @@ const server = http.createServer(app);
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Fallback for any legacy mock complaints referencing local upload paths
+app.get('/uploads/complaints/:filename', (req, res) => {
+  res.redirect('https://images.unsplash.com/photo-1517420704952-d9f39e95b43e?auto=format&fit=crop&w=800&q=80');
+});
 
 // Health Check API
 app.get('/api/health', (req, res) => {
@@ -29,6 +41,12 @@ app.use('/api/auth', authRoutes);
 
 // Asset API Routes
 app.use('/api/assets', assetRoutes);
+
+// Complaint API Routes
+app.use('/api/complaints', complaintRoutes);
+
+// Work Order API Routes
+app.use('/api/work-orders', workOrderRoutes);
 
 // Error Handler Middleware
 app.use(errorHandler);

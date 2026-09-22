@@ -4,23 +4,50 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 
-// A simple helper to protect pages
+import { isAuthenticated, logout } from './services/authService';
+
+// ProtectedRoute: Redirects to /login if user is not authenticated
 const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" replace />;
+  if (!isAuthenticated()) {
+    logout();
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
+// PublicRoute: Redirects to / (dashboard) if user is already authenticated
+const PublicRoute = ({ children }) => {
+  if (isAuthenticated()) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
 };
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Public Login Route */}
-        <Route path="/login" element={<Login />} />
+        {/* Public Login Route (redirects to / if already logged in) */}
+        <Route 
+          path="/login" 
+          element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          } 
+        />
 
-        {/* Public Register Route */}
-        <Route path="/register" element={<Register />} />
+        {/* Public Register Route (redirects to / if already logged in) */}
+        <Route 
+          path="/register" 
+          element={
+            <PublicRoute>
+              <Register />
+            </PublicRoute>
+          } 
+        />
 
-        {/* Protected Dashboard Route (Checks if logged in) */}
+        {/* Protected Dashboard Route (redirects to /login if not logged in) */}
         <Route 
           path="/" 
           element={
@@ -30,7 +57,7 @@ function App() {
           } 
         />
 
-        {/* Redirect any other path to Dashboard */}
+        {/* Redirect any other unknown path to root */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

@@ -64,16 +64,64 @@ export const logout = () => {
 };
 
 /**
- * Check if user is logged in
+ * Check if a JWT token is expired
  */
-export const isAuthenticated = () => {
-  return localStorage.getItem('token') !== null;
+export const isTokenExpired = (token) => {
+  if (!token || typeof token !== 'string') return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const payload = JSON.parse(atob(parts[1]));
+    if (!payload.exp) return false;
+    return Date.now() >= payload.exp * 1000;
+  } catch {
+    return true;
+  }
 };
 
 /**
- * Get current user info from localStorage
+ * Check if user is logged in with valid non-expired token and profile
+ */
+export const isAuthenticated = () => {
+  const token = localStorage.getItem('token');
+  const user = localStorage.getItem('user');
+
+  if (!token || token === 'undefined' || token === 'null' || !token.trim()) {
+    logout();
+    return false;
+  }
+  if (!user || user === 'undefined' || user === 'null') {
+    logout();
+    return false;
+  }
+
+  if (isTokenExpired(token)) {
+    logout();
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(user);
+    if (!parsed || !parsed.id) {
+      logout();
+      return false;
+    }
+    return true;
+  } catch {
+    logout();
+    return false;
+  }
+};
+
+/**
+ * Get current user info from localStorage safely
  */
 export const getCurrentUser = () => {
-  const user = localStorage.getItem('user');
-  return user ? JSON.parse(user) : null;
+  try {
+    const user = localStorage.getItem('user');
+    if (!user || user === 'undefined' || user === 'null') return null;
+    return JSON.parse(user);
+  } catch {
+    return null;
+  }
 };

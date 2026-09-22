@@ -1,4 +1,4 @@
-const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/assets`;
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/complaints`;
 
 const getHeaders = () => {
   const token = localStorage.getItem('token');
@@ -24,59 +24,50 @@ const handleResponse = async (response) => {
   return data;
 };
 
-export const getAssets = async (filters = {}) => {
+export const getComplaints = async (filters = {}) => {
   const query = new URLSearchParams(filters).toString();
   const response = await fetch(`${API_URL}?${query}`, {
     method: 'GET',
     headers: getHeaders()
   });
   const data = await handleResponse(response);
-  return data.assets;
+  return data.complaints;
 };
 
-export const getAssetById = async (id) => {
+export const getComplaintById = async (id) => {
   const response = await fetch(`${API_URL}/${id}`, {
     method: 'GET',
     headers: getHeaders()
   });
   const data = await handleResponse(response);
-  return data.asset;
+  return data.complaint;
 };
 
-export const createAsset = async (assetData) => {
+export const createComplaint = async (complaintData) => {
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify(assetData)
+    body: JSON.stringify(complaintData)
   });
   const data = await handleResponse(response);
-  return data;
+  return data.complaint;
 };
 
-export const updateAsset = async (id, assetData) => {
+export const updateComplaint = async (id, complaintData) => {
   const response = await fetch(`${API_URL}/${id}`, {
     method: 'PUT',
     headers: getHeaders(),
-    body: JSON.stringify(assetData)
+    body: JSON.stringify(complaintData)
   });
   const data = await handleResponse(response);
-  return data;
+  return data.complaint;
 };
 
-export const deleteAsset = async (id) => {
+export const deleteComplaint = async (id) => {
   const response = await fetch(`${API_URL}/${id}`, {
     method: 'DELETE',
     headers: getHeaders()
   });
   const data = await handleResponse(response);
   return data;
-};
-
-export const getDepartments = async () => {
-  const response = await fetch(`${API_URL}/departments`, {
-    method: 'GET',
-    headers: getHeaders()
-  });
-  const data = await handleResponse(response);
-  return data.departments;
 };

@@ -7,36 +7,48 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
+        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
       },
       colors: {
-        // High-end dark and light brand palettes
+        // High-end clean light mode slate palettes
         primary: {
-          50: '#f4f6f8',
-          100: '#e9ecef',
-          200: '#dee2e6',
-          300: '#ced4da',
-          400: '#adb5bd',
-          500: '#6c757d',
-          600: '#495057',
-          700: '#343a40',
-          800: '#212529',
-          900: '#121416',
+          50: '#f8fafc',  // Slate-50 (Main light background)
+          100: '#f1f5f9', // Slate-100 (Secondary backgrounds)
+          200: '#e2e8f0', // Slate-200 (Dividers, borders)
+          300: '#cbd5e1', // Slate-300
+          400: '#94a3b8', // Slate-400
+          500: '#64748b', // Slate-500
+          600: '#475569', // Slate-600
+          700: '#334155', // Slate-700
+          800: '#1e293b', // Slate-800
+          900: '#0f172a', // Slate-900 (Dark titles/texts)
+          950: '#020617', // Slate-950
         },
         accent: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1', // Indigo
-          600: '#4f46e5',
-          700: '#4338ca',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#2563eb', // Royal Blue
+          600: '#1d4ed8', // Darker Royal Blue
+          700: '#1e40af',
+          glow: '#3b82f6',
         },
-        success: '#10b981', // Emerald
-        warning: '#f59e0b', // Amber
-        danger: '#ef4444',  // Rose
-        info: '#3b82f6',    // Blue
+        cyber: {
+          teal: '#0d9488', // Teal-600
+          cyan: '#0891b2', // Cyan-600
+          pink: '#db2777', // Pink-600
+        },
+        success: '#059669', // Emerald-600
+        warning: '#d97706', // Amber-600
+        danger: '#dc2626',  // Red-600
+        info: '#2563eb',    // Blue-600
+      },
+      boxShadow: {
+        'accent-glow': '0 0 15px rgba(37, 99, 235, 0.15)',
+        'soft': '0 8px 30px rgba(15, 23, 42, 0.04)',
+        'medium': '0 10px 40px rgba(15, 23, 42, 0.08)',
       }
     },
   },

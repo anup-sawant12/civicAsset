@@ -2,26 +2,73 @@
 @config "../tailwind.config.js";
 
 body {
-  @apply bg-primary-900 text-primary-100 min-h-screen antialiased;
-  font-family: 'Inter', sans-serif;
+  @apply bg-primary-50 text-primary-800 min-h-screen antialiased overflow-x-hidden;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  background-image: radial-gradient(circle at 80% 0%, rgba(37, 99, 235, 0.05) 0%, transparent 45%),
+                    radial-gradient(circle at 10% 90%, rgba(13, 148, 136, 0.04) 0%, transparent 45%);
 }
 
-/* Glassmorphism utility card styling */
+/* Premium Light Mode Glassmorphism utility */
 .glass-panel {
-  @apply bg-primary-800/40 backdrop-blur-md border border-primary-700/30 rounded-xl shadow-lg;
+  @apply bg-white/75 backdrop-blur-xl border border-primary-200/60 shadow-soft transition-all duration-300;
 }
 
-/* Customized scrollbar */
+.glass-panel-hover {
+  @apply hover:border-accent-500/35 hover:shadow-accent-glow hover:-translate-y-0.5;
+}
+
+/* Scrollbar Modernization */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  @apply bg-primary-900;
+  @apply bg-primary-50;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-primary-700/50 rounded-full;
+  @apply bg-primary-300/50 rounded-full hover:bg-primary-400 transition-colors;
 }
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-primary-600;
+
+/* Custom Micro-Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 12px rgba(37, 99, 235, 0.08); }
+  50% { box-shadow: 0 0 24px rgba(37, 99, 235, 0.2); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s infinite ease-in-out;
+}
+
+/* Leaflet Map Light Styles */
+.leaflet-container {
+  font-family: inherit;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+  overflow: hidden;
+}
+
+.leaflet-bar {
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+}
+
+.leaflet-bar a {
+  background: transparent;
+  color: #1e293b;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.leaflet-bar a:hover {
+  background: rgba(37, 99, 235, 0.08);
 }
