@@ -1,0 +1,471 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/* =========================
+   ENUMS
+========================= */
+
+enum UserRole {
+  ADMIN
+  OFFICER
+  FIELD_WORKER
+  CITIZEN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum AssetType {
+  STREETLIGHT
+  WATER_PIPELINE
+  TRANSFORMER
+  ROAD
+  DRAINAGE
+  TRAFFIC_SIGNAL
+  PUBLIC_TOILET
+  PARK
+  GARBAGE_BIN
+  OTHER
+}
+
+enum AssetStatus {
+  OPERATIONAL
+  UNDER_MAINTENANCE
+  DAMAGED
+  INACTIVE
+  RETIRED
+}
+
+enum AssetCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  CRITICAL
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ComplaintStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  VERIFIED
+  CLOSED
+  REJECTED
+}
+
+enum ComplaintSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ComplaintPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum WorkOrderStatus {
+  CREATED
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  CLOSED
+  CANCELLED
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  INSPECTION
+  EMERGENCY
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  COMPLAINT
+  WORK_ORDER
+  SLA
+  MAINTENANCE
+  SYSTEM
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  STATUS_CHANGE
+  ASSIGN
+  VERIFY
+  CLOSE
+  REJECT
+}
+
+enum DocumentType {
+  BEFORE_IMAGE
+  AFTER_IMAGE
+  MAINTENANCE_IMAGE
+  COMPLAINT_IMAGE
+  OTHER
+}
+
+
+/* =========================
+   DEPARTMENT
+========================= */
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+
+  users       User[]
+  assets      Asset[]
+  complaints  Complaint[]
+  workOrders  WorkOrder[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
+
+/* =========================
+   USER
+========================= */
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+
+  firstName    String
+  lastName     String
+  phone        String?
+
+  role         UserRole   @default(CITIZEN)
+  status       UserStatus @default(ACTIVE)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  complaints           Complaint[] @relation("CitizenComplaints")
+  assignedWorkOrders   WorkOrder[] @relation("AssignedWorker")
+  officerWorkOrders    WorkOrder[] @relation("AssignedOfficer")
+
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+
+  maintenanceRecords   MaintenanceRecord[] @relation("MaintenanceCreatedBy")
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([role])
+  @@index([departmentId])
+  @@index([status])
+}
+
+
+/* =========================
+   ASSET
+========================= */
+
+model Asset {
+  id              String          @id @default(cuid())
+
+  assetCode       String          @unique
+  name            String
+  assetType       AssetType
+
+  description     String?
+
+  status          AssetStatus     @default(OPERATIONAL)
+  condition       AssetCondition  @default(GOOD)
+
+  latitude        Float
+  longitude       Float
+
+  address         String?
+
+  installationDate DateTime?
+  lastMaintenance DateTime?
+  nextMaintenance DateTime?
+
+  riskScore       Float           @default(0)
+  riskLevel       RiskLevel       @default(LOW)
+
+  departmentId    String
+  department      Department      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  complaints      Complaint[]
+  workOrders      WorkOrder[]
+  maintenanceRecords MaintenanceRecord[]
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([assetType])
+  @@index([status])
+  @@index([condition])
+  @@index([riskLevel])
+  @@index([departmentId])
+  @@index([latitude, longitude])
+}
+
+
+/* =========================
+   COMPLAINT
+========================= */
+
+model Complaint {
+  id              String             @id @default(cuid())
+
+  complaintCode   String             @unique
+
+  category        String
+  description     String
+
+  severity        ComplaintSeverity  @default(MEDIUM)
+  priority        ComplaintPriority  @default(MEDIUM)
+
+  status          ComplaintStatus    @default(SUBMITTED)
+
+  latitude        Float
+  longitude       Float
+
+  address         String?
+
+  imageUrl        String?
+
+  citizenId       String
+  citizen         User               @relation("CitizenComplaints", fields: [citizenId], references: [id], onDelete: Cascade)
+
+  assetId         String?
+  asset           Asset?             @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  departmentId    String
+  department      Department         @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  workOrder       WorkOrder?
+
+  submittedAt     DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+
+  @@index([citizenId])
+  @@index([assetId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@index([latitude, longitude])
+}
+
+
+/* =========================
+   WORK ORDER
+========================= */
+
+model WorkOrder {
+  id                String           @id @default(cuid())
+
+  workOrderCode     String           @unique
+
+  complaintId       String           @unique
+  complaint         Complaint        @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  assetId           String?
+  asset             Asset?           @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  departmentId      String
+  department        Department       @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  assignedOfficerId String?
+  assignedOfficer   User?            @relation("AssignedOfficer", fields: [assignedOfficerId], references: [id], onDelete: SetNull)
+
+  assignedWorkerId  String?
+  assignedWorker    User?            @relation("AssignedWorker", fields: [assignedWorkerId], references: [id], onDelete: SetNull)
+
+  status            WorkOrderStatus  @default(CREATED)
+
+  slaHours          Int?
+  slaDeadline       DateTime?
+  slaBreached       Boolean          @default(false)
+
+  beforeImage       String?
+  afterImage        String?
+
+  repairNotes       String?
+  rejectionReason   String?
+
+  assignedAt        DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  verifiedAt        DateTime?
+  closedAt          DateTime?
+
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([assignedWorkerId])
+  @@index([assignedOfficerId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([slaDeadline])
+  @@index([slaBreached])
+}
+
+
+/* =========================
+   MAINTENANCE RECORD
+========================= */
+
+model MaintenanceRecord {
+  id             String            @id @default(cuid())
+
+  assetId        String
+  asset          Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  type           MaintenanceType
+  status         MaintenanceStatus @default(SCHEDULED)
+
+  title          String
+  description    String?
+
+  scheduledDate  DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  cost           Float?
+
+  notes          String?
+
+  createdById    String?
+  createdBy      User?             @relation("MaintenanceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([assetId])
+  @@index([type])
+  @@index([status])
+  @@index([scheduledDate])
+}
+
+
+/* =========================
+   NOTIFICATION
+========================= */
+
+model Notification {
+  id          String           @id @default(cuid())
+
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        NotificationType
+  title       String
+  message     String
+
+  referenceId String?
+  isRead      Boolean          @default(false)
+
+  createdAt   DateTime         @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+
+/* =========================
+   AUDIT LOG
+========================= */
+
+model AuditLog {
+  id          String      @id @default(cuid())
+
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action      AuditAction
+
+  entityType  String
+  entityId    String?
+
+  description String?
+
+  oldValue    Json?
+  newValue    Json?
+
+  ipAddress   String?
+
+  createdAt   DateTime    @default(now())
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+
+/* =========================
+   DOCUMENT
+========================= */
+
+model Document {
+  id           String       @id @default(cuid())
+
+  documentType DocumentType
+
+  fileUrl      String
+  fileName     String?
+  mimeType     String?
+
+  complaintId  String?
+  workOrderId  String?
+  assetId      String?
+
+  uploadedById String?
+
+  createdAt    DateTime     @default(now())
+
+  @@index([complaintId])
+  @@index([workOrderId])
+  @@index([assetId])
+  @@index([uploadedById])
+}
