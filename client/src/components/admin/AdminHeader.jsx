@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import { ShieldAlert, Users, Building, LayoutDashboard, Layers, LogOut, MapPin, ClipboardList, Wrench } from 'lucide-react';
+import ThemeToggle from '../common/ThemeToggle';
 
 export function AdminHeader({ activePage }) {
   const { user, logout } = useAuth();
@@ -61,6 +62,7 @@ export function AdminHeader({ activePage }) {
             </span>
             <span className="text-[10px] text-slate-400">{user?.email}</span>
           </div>
+          <ThemeToggle />
           <button
             onClick={logout}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700 transition-colors cursor-pointer"

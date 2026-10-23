@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
-import { UserCheck, ClipboardList, Wrench, UserPlus, CheckSquare, LogOut, CheckCircle, Layers, MapPin } from 'lucide-react';
+import OfficerHeader from '../../components/officer/OfficerHeader';
+import { ClipboardList, Wrench, UserPlus, CheckSquare, CheckCircle, Layers, MapPin } from 'lucide-react';
 
 export function OfficerDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const officerModules = [
     { title: 'Municipal Assets Registry', desc: 'Inspect infrastructure condition, maintenance dates & risk scores', icon: Layers, link: '/admin/assets' },
@@ -15,39 +16,8 @@ export function OfficerDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      {/* Top Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-              <UserCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="font-bold text-white text-base tracking-tight">CIVICASSET</span>
-              <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                OFFICER PORTAL
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex flex-col text-right">
-              <span className="text-sm font-semibold text-slate-200">
-                {user?.firstName} {user?.lastName}
-              </span>
-              <span className="text-xs text-slate-400">{user?.email}</span>
-            </div>
-            <button
-              onClick={logout}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+      <OfficerHeader activePage="overview" />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">

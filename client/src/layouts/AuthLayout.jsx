@@ -1,13 +1,19 @@
 import { Outlet } from 'react-router-dom';
 import { Building2, ShieldCheck, MapPin, Activity, CheckCircle2 } from 'lucide-react';
+import ThemeToggle from '../components/common/ThemeToggle';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
 export function AuthLayout({ children }) {
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-slate-950 text-slate-100">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-slate-950 text-slate-100 relative">
+      {/* Floating Theme Switcher */}
+      <div className="absolute top-4 right-4 z-30">
+        <ThemeToggle showLabel={true} />
+      </div>
+
       {/* Left/Hero Panel (Desktop) */}
-      <div className="relative hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-slate-950 to-emerald-950 p-12 flex-col justify-between overflow-hidden border-r border-slate-800">
+      <div className="relative hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-slate-950 to-emerald-950 p-12 flex-col justify-between overflow-hidden border-r border-slate-800 auth-hero">
         {/* Subtle background glowing ambient orbs */}
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />

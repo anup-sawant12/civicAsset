@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
-import { User, AlertTriangle, FileText, SearchCheck, LogOut, CheckCircle } from 'lucide-react';
+import CitizenHeader from '../../components/citizen/CitizenHeader';
+import { AlertTriangle, FileText, SearchCheck, CheckCircle } from 'lucide-react';
 
 export function CitizenDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const citizenModules = [
     { title: 'Report Issue / Complaint', desc: 'Report an infrastructure issue with GPS location & photo evidence', icon: AlertTriangle, link: '/citizen/complaints/new', action: 'Report Now →' },
@@ -12,39 +13,8 @@ export function CitizenDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      {/* Top Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <User className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="font-bold text-white text-base tracking-tight">CIVICASSET</span>
-              <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                CITIZEN PORTAL
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex flex-col text-right">
-              <span className="text-sm font-semibold text-slate-200">
-                {user?.firstName} {user?.lastName}
-              </span>
-              <span className="text-xs text-slate-400">{user?.email}</span>
-            </div>
-            <button
-              onClick={logout}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+      <CitizenHeader activePage="overview" />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">

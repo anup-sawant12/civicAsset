@@ -2,13 +2,17 @@ import { Link } from 'react-router-dom';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
 import { getRoleDashboardPath } from '../../utils/authUtils';
+import ThemeToggle from '../../components/common/ThemeToggle';
 
 export function Unauthorized() {
   const { user } = useAuth();
   const returnPath = getRoleDashboardPath(user?.role);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 relative">
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle showLabel={true} />
+      </div>
       <div className="max-w-md w-full p-8 rounded-2xl bg-slate-900 border border-slate-800 text-center shadow-2xl space-y-6">
         <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 mx-auto flex items-center justify-center">
           <ShieldAlert className="w-8 h-8" />
